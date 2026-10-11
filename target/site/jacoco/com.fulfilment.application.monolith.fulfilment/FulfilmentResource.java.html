@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FulfilmentResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">java-code-assignment</a> &gt; <a href="index.source.html" class="el_package">com.fulfilment.application.monolith.fulfilment</a> &gt; <span class="el_source">FulfilmentResource.java</span></div><h1>FulfilmentResource.java</h1><pre class="source lang-java linenums">package com.fulfilment.application.monolith.fulfilment;
+
+import com.fulfilment.application.monolith.products.Product;
+import com.fulfilment.application.monolith.products.ProductRepository;
+import com.fulfilment.application.monolith.stores.Store;
+import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
+import java.util.List;
+
+@Path(&quot;fulfilment&quot;)
+@ApplicationScoped
+@Produces(&quot;application/json&quot;)
+@Consumes(&quot;application/json&quot;)
+<span class="fc" id="L26">public class FulfilmentResource {</span>
+
+  @Inject WarehouseRepository warehouses;
+  @Inject ProductRepository products;
+
+<span class="fc" id="L31">  public record AssignmentRequest(Long storeId, Long productId, Long warehouseId) {}</span>
+<span class="fc" id="L32">  public record AssignmentResponse(Long id, Long storeId, Long productId, Long warehouseId) {}</span>
+
+  @GET
+  public List&lt;AssignmentResponse&gt; list() {
+<span class="fc" id="L36">    return FulfilmentAssignment.&lt;FulfilmentAssignment&gt;list(&quot;warehouse.archivedAt is null order by id&quot;)</span>
+<span class="fc" id="L37">        .stream().map(this::response).toList();</span>
+  }
+
+  @POST
+  @Transactional
+  public Response create(AssignmentRequest request) {
+<span class="fc bfc" id="L43" title="All 6 branches covered.">    if (request == null || request.storeId() == null || request.productId() == null</span>
+<span class="fc bfc" id="L44" title="All 6 branches covered.">        || request.warehouseId() == null || request.storeId() &lt;= 0 || request.productId() &lt;= 0</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        || request.warehouseId() &lt;= 0) {</span>
+<span class="fc" id="L46">      throw new BadRequestException(&quot;Positive store, product and warehouse ids are required&quot;);</span>
+    }
+<span class="fc" id="L48">    warehouses.lock();</span>
+<span class="fc" id="L49">    Store store = Store.findById(request.storeId());</span>
+<span class="fc" id="L50">    Product product = products.findById(request.productId());</span>
+<span class="fc" id="L51">    var warehouse = warehouses.findById(request.warehouseId());</span>
+<span class="fc bfc" id="L52" title="All 8 branches covered.">    if (store == null || product == null || warehouse == null || warehouse.archivedAt != null) {</span>
+<span class="fc" id="L53">      throw new NotFoundException(&quot;Store, product or active warehouse does not exist&quot;);</span>
+    }
+<span class="fc" id="L55">    FulfilmentAssignment existing = FulfilmentAssignment.find(</span>
+        &quot;store.id = ?1 and product.id = ?2 and warehouse.id = ?3&quot;,
+<span class="fc" id="L57">        store.id, product.id, warehouse.id).firstResult();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">    if (existing != null) {</span>
+<span class="fc" id="L59">      return Response.ok(response(existing)).build();</span>
+    }
+<span class="fc" id="L61">    var assignments = FulfilmentAssignment.&lt;FulfilmentAssignment&gt;list(&quot;warehouse.archivedAt is null&quot;);</span>
+<span class="fc" id="L62">    long productWarehouses = assignments.stream()</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        .filter(a -&gt; a.store.id.equals(store.id) &amp;&amp; a.product.id.equals(product.id))</span>
+<span class="fc" id="L64">        .map(a -&gt; a.warehouse.id).distinct().count();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">    if (productWarehouses &gt;= 2) {</span>
+<span class="fc" id="L66">      throw new WebApplicationException(&quot;A product can use at most two warehouses per store&quot;, 409);</span>
+    }
+<span class="fc" id="L68">    var storeWarehouses = assignments.stream().filter(a -&gt; a.store.id.equals(store.id))</span>
+<span class="fc" id="L69">        .map(a -&gt; a.warehouse.id).distinct().toList();</span>
+<span class="fc bfc" id="L70" title="All 4 branches covered.">    if (!storeWarehouses.contains(warehouse.id) &amp;&amp; storeWarehouses.size() &gt;= 3) {</span>
+<span class="fc" id="L71">      throw new WebApplicationException(&quot;A store can use at most three warehouses&quot;, 409);</span>
+    }
+<span class="fc" id="L73">    var warehouseProducts = assignments.stream().filter(a -&gt; a.warehouse.id.equals(warehouse.id))</span>
+<span class="fc" id="L74">        .map(a -&gt; a.product.id).distinct().toList();</span>
+<span class="fc bfc" id="L75" title="All 4 branches covered.">    if (!warehouseProducts.contains(product.id) &amp;&amp; warehouseProducts.size() &gt;= 5) {</span>
+<span class="fc" id="L76">      throw new WebApplicationException(&quot;A warehouse can store at most five product types&quot;, 409);</span>
+    }
+<span class="fc" id="L78">    var assignment = new FulfilmentAssignment();</span>
+<span class="fc" id="L79">    assignment.store = store;</span>
+<span class="fc" id="L80">    assignment.product = product;</span>
+<span class="fc" id="L81">    assignment.warehouse = warehouse;</span>
+<span class="fc" id="L82">    assignment.persistAndFlush();</span>
+<span class="fc" id="L83">    return Response.status(201).entity(response(assignment)).build();</span>
+  }
+
+  @DELETE
+  @Path(&quot;{id}&quot;)
+  @Transactional
+  public Response delete(Long id) {
+<span class="fc" id="L90">    warehouses.lock();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">    if (!FulfilmentAssignment.deleteById(id)) {</span>
+<span class="fc" id="L92">      throw new NotFoundException(&quot;Fulfilment assignment does not exist&quot;);</span>
+    }
+<span class="fc" id="L94">    return Response.noContent().build();</span>
+  }
+
+  private AssignmentResponse response(FulfilmentAssignment assignment) {
+<span class="fc" id="L98">    return new AssignmentResponse(assignment.id, assignment.store.id, assignment.product.id,</span>
+        assignment.warehouse.id);
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

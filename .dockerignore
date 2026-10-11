@@ -1,0 +1,8 @@
+*
+!src/
+!src/main/
+!src/main/docker/
+!src/main/docker/Dockerfile.jvm
+!target/
+!target/quarkus-app/
+!target/quarkus-app/**

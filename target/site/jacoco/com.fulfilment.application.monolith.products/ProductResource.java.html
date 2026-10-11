@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">java-code-assignment</a> &gt; <a href="index.source.html" class="el_package">com.fulfilment.application.monolith.products</a> &gt; <span class="el_source">ProductResource.java</span></div><h1>ProductResource.java</h1><pre class="source lang-java linenums">package com.fulfilment.application.monolith.products;
+
+import com.fulfilment.application.monolith.fulfilment.FulfilmentAssignment;
+import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
+import io.quarkus.panache.common.Sort;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
+import java.util.List;
+import java.math.BigDecimal;
+
+@Path(&quot;product&quot;)
+@ApplicationScoped
+@Produces(&quot;application/json&quot;)
+@Consumes(&quot;application/json&quot;)
+<span class="fc" id="L25">public class ProductResource {</span>
+
+  @Inject ProductRepository productRepository;
+  @Inject WarehouseRepository warehouses;
+
+  @GET
+  public List&lt;Product&gt; get() {
+<span class="fc" id="L32">    return productRepository.listAll(Sort.by(&quot;name&quot;));</span>
+  }
+
+  @GET
+  @Path(&quot;{id}&quot;)
+  public Product getSingle(Long id) {
+<span class="fc" id="L38">    Product entity = productRepository.findById(id);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">    if (entity == null) {</span>
+<span class="fc" id="L40">      throw new WebApplicationException(&quot;Product with id of &quot; + id + &quot; does not exist.&quot;, 404);</span>
+    }
+<span class="fc" id="L42">    return entity;</span>
+  }
+
+  @POST
+  @Transactional
+  public Response create(Product product) {
+<span class="fc" id="L48">    validate(product);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">    if (product.id != null) {</span>
+<span class="fc" id="L50">      throw new WebApplicationException(&quot;Id was invalidly set on request.&quot;, 422);</span>
+    }
+
+<span class="fc" id="L53">    productRepository.persistAndFlush(product);</span>
+<span class="fc" id="L54">    return Response.ok(product).status(201).build();</span>
+  }
+
+  @PUT
+  @Path(&quot;{id}&quot;)
+  @Transactional
+  public Product update(Long id, Product product) {
+<span class="fc" id="L61">    validate(product);</span>
+
+<span class="fc" id="L63">    Product entity = productRepository.findById(id);</span>
+
+<span class="fc bfc" id="L65" title="All 2 branches covered.">    if (entity == null) {</span>
+<span class="fc" id="L66">      throw new WebApplicationException(&quot;Product with id of &quot; + id + &quot; does not exist.&quot;, 404);</span>
+    }
+
+<span class="fc" id="L69">    entity.name = product.name;</span>
+<span class="fc" id="L70">    entity.description = product.description;</span>
+<span class="fc" id="L71">    entity.price = product.price;</span>
+<span class="fc" id="L72">    entity.stock = product.stock;</span>
+
+<span class="fc" id="L74">    productRepository.flush();</span>
+
+<span class="fc" id="L76">    return entity;</span>
+  }
+
+  @DELETE
+  @Path(&quot;{id}&quot;)
+  @Transactional
+  public Response delete(Long id) {
+<span class="fc" id="L83">    warehouses.lock();</span>
+<span class="fc" id="L84">    Product entity = productRepository.findById(id);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">    if (entity == null) {</span>
+<span class="fc" id="L86">      throw new WebApplicationException(&quot;Product with id of &quot; + id + &quot; does not exist.&quot;, 404);</span>
+    }
+<span class="fc" id="L88">    FulfilmentAssignment.delete(&quot;product.id&quot;, id);</span>
+<span class="fc" id="L89">    productRepository.delete(entity);</span>
+<span class="fc" id="L90">    return Response.status(204).build();</span>
+  }
+
+  private void validate(Product product) {
+<span class="fc bfc" id="L94" title="All 12 branches covered.">    if (product == null || product.name == null || product.name.isBlank() || product.name.length() &gt; 40</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        || product.stock &lt; 0 || (product.price != null &amp;&amp; (product.price.signum() &lt; 0</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        || product.price.compareTo(new BigDecimal(&quot;99999999.99&quot;)) &gt; 0</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        || product.price.stripTrailingZeros().scale() &gt; 2))) {</span>
+<span class="fc" id="L98">      throw new WebApplicationException(&quot;Product requires a name (maximum 40 characters), non-negative stock and a valid price.&quot;, 422);</span>
+    }
+<span class="fc" id="L100">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

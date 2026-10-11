@@ -1,0 +1,161 @@
+openapi: 3.0.0
+info:
+  title: Warehouse API
+  description: Manage active warehouse units while preserving archived versions.
+  version: 1.0.0
+
+paths:
+  /warehouse:
+    get:
+      summary: List all warehouses units
+      responses:
+        '200':
+          description: Active warehouse units only
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Warehouse'
+    post:
+      summary: Create a new warehouse unit
+      description: Business unit code, location, capacity and stock are required. Id is assigned by the server.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Warehouse'
+      responses:
+        '201':
+          description: Warehouse unit created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /warehouse/{id}:
+    get:
+      summary: Get a warehouse unit by ID
+      parameters:
+        - $ref: '#/components/parameters/WarehouseId'
+      responses:
+        '200':
+          description: Active warehouse unit found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      summary: Archive a warehouse unit by ID
+      parameters:
+        - $ref: '#/components/parameters/WarehouseId'
+      responses:
+        '204':
+          description: Warehouse unit archived; its history is retained
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /warehouse/{businessUnitCode}/replacement:
+    post:
+      summary: Replace the current active Warehouse
+      description: |
+        Archives the active warehouse and creates a new row with the same business unit code
+        in one transaction. Stock must match the previous warehouse. A body code may be
+        omitted, but if supplied it must match the path. Id must be omitted.
+      parameters:
+        - name: businessUnitCode
+          in: path
+          required: true
+          description: Business unit code of the active warehouse to replace
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Warehouse'
+      responses:
+        '200':
+          description: Warehouse unit replaced, with a new id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Warehouse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+
+components:
+  parameters:
+    WarehouseId:
+      name: id
+      in: path
+      required: true
+      description: Positive numeric id of a physical warehouse row
+      schema:
+        type: string
+        pattern: '^[1-9][0-9]*$'
+  responses:
+    InvalidRequest:
+      description: Invalid fields, location, stock or location limits
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Conflict:
+      description: An active warehouse already uses the business unit code
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: No active warehouse exists for this id or business unit code
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: integer
+        error:
+          type: string
+    Warehouse:
+      type: object
+      required: [location, capacity, stock]
+      properties:
+        id:
+          type: string
+          readOnly: true
+          example: "456"
+        businessUnitCode:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: "MWH.001"
+        location:
+          type: string
+          example: "AMSTERDAM-001"
+        capacity:
+          type: integer
+          minimum: 1
+          example: 20
+        stock:
+          type: integer
+          minimum: 0
+          example: 10

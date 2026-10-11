@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StoreResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">java-code-assignment</a> &gt; <a href="index.source.html" class="el_package">com.fulfilment.application.monolith.stores</a> &gt; <span class="el_source">StoreResource.java</span></div><h1>StoreResource.java</h1><pre class="source lang-java linenums">package com.fulfilment.application.monolith.stores;
+
+import com.fulfilment.application.monolith.fulfilment.FulfilmentAssignment;
+import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
+import io.quarkus.panache.common.Sort;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.PATCH;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.core.Response;
+import java.util.List;
+
+@Path(&quot;store&quot;)
+@ApplicationScoped
+@Produces(&quot;application/json&quot;)
+@Consumes(&quot;application/json&quot;)
+<span class="fc" id="L27">public class StoreResource {</span>
+
+  @Inject StoreLegacySync legacySync;
+  @Inject WarehouseRepository warehouses;
+
+  @GET
+  public List&lt;Store&gt; get() {
+<span class="fc" id="L34">    return Store.listAll(Sort.by(&quot;name&quot;));</span>
+  }
+
+  @GET
+  @Path(&quot;{id}&quot;)
+  public Store getSingle(Long id) {
+<span class="fc" id="L40">    Store entity = Store.findById(id);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">    if (entity == null) {</span>
+<span class="fc" id="L42">      throw new NotFoundException(&quot;Store with id of &quot; + id + &quot; does not exist.&quot;);</span>
+    }
+<span class="fc" id="L44">    return entity;</span>
+  }
+
+  @POST
+  @Transactional
+  public Response create(Store store) {
+<span class="fc" id="L50">    validate(store);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">    if (store.id != null) {</span>
+<span class="fc" id="L52">      throw new WebApplicationException(&quot;Id was invalidly set on request.&quot;, 422);</span>
+    }
+<span class="fc" id="L54">    store.persistAndFlush();</span>
+<span class="fc" id="L55">    legacySync.afterCommit(store, true);</span>
+<span class="fc" id="L56">    return Response.status(201).entity(store).build();</span>
+  }
+
+  @PUT
+  @Path(&quot;{id}&quot;)
+  @Transactional
+  public Store update(Long id, Store updatedStore) {
+<span class="fc" id="L63">    validate(updatedStore);</span>
+<span class="fc" id="L64">    Store entity = getSingle(id);</span>
+<span class="fc" id="L65">    entity.name = updatedStore.name;</span>
+<span class="fc" id="L66">    entity.quantityProductsInStock = updatedStore.quantityProductsInStock;</span>
+<span class="fc" id="L67">    entity.flush();</span>
+<span class="fc" id="L68">    legacySync.afterCommit(entity, false);</span>
+<span class="fc" id="L69">    return entity;</span>
+  }
+
+<span class="fc" id="L72">  public record StorePatch(String name, Integer quantityProductsInStock) {}</span>
+
+  @PATCH
+  @Path(&quot;{id}&quot;)
+  @Transactional
+  public Store patch(Long id, StorePatch patch) {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">    if (patch == null) {</span>
+<span class="fc" id="L79">      throw new BadRequestException(&quot;Store body is required&quot;);</span>
+    }
+<span class="fc" id="L81">    Store entity = getSingle(id);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">    if (patch.name() != null) {</span>
+<span class="fc" id="L83">      entity.name = patch.name();</span>
+    }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">    if (patch.quantityProductsInStock() != null) {</span>
+<span class="fc" id="L86">      entity.quantityProductsInStock = patch.quantityProductsInStock();</span>
+    }
+<span class="fc" id="L88">    validate(entity);</span>
+<span class="fc" id="L89">    entity.flush();</span>
+<span class="fc" id="L90">    legacySync.afterCommit(entity, false);</span>
+<span class="fc" id="L91">    return entity;</span>
+  }
+
+  @DELETE
+  @Path(&quot;{id}&quot;)
+  @Transactional
+  public Response delete(Long id) {
+<span class="fc" id="L98">    warehouses.lock();</span>
+<span class="fc" id="L99">    Store entity = getSingle(id);</span>
+<span class="fc" id="L100">    FulfilmentAssignment.delete(&quot;store.id&quot;, id);</span>
+<span class="fc" id="L101">    entity.delete();</span>
+<span class="fc" id="L102">    return Response.noContent().build();</span>
+  }
+
+  private void validate(Store store) {
+<span class="fc bfc" id="L106" title="All 10 branches covered.">    if (store == null || store.name == null || store.name.isBlank() || store.name.length() &gt; 40</span>
+        || store.quantityProductsInStock &lt; 0) {
+<span class="fc" id="L108">      throw new WebApplicationException(&quot;Store name is required (maximum 40 characters) and stock must be non-negative.&quot;, 422);</span>
+    }
+<span class="fc" id="L110">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

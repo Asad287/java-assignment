@@ -1,0 +1,5 @@
+# Created at 2026-10-11T21:16:42.198
+Boot Manifest-JAR contains absolute paths in classpath 'E:\AsadCV\EuroPassCV\fcs-interview-code-assignment-main\fcs-interview-code-assignment-main\java-assignment\target\test-classes'
+Hint: <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+'other' has different root
+

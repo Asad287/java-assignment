@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WarehouseRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">java-code-assignment</a> &gt; <a href="index.source.html" class="el_package">com.fulfilment.application.monolith.warehouses.adapters.database</a> &gt; <span class="el_source">WarehouseRepository.java</span></div><h1>WarehouseRepository.java</h1><pre class="source lang-java linenums">package com.fulfilment.application.monolith.warehouses.adapters.database;
+
+import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
+import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
+import io.quarkus.hibernate.orm.panache.PanacheRepository;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@ApplicationScoped
+<span class="fc" id="L12">public class WarehouseRepository implements WarehouseStore, PanacheRepository&lt;DbWarehouse&gt; {</span>
+
+  @Override
+  public void lock() {
+<span class="fc" id="L16">    var lock = getEntityManager().find(WarehouseLock.class, 1L, LockModeType.PESSIMISTIC_WRITE);</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">    if (lock == null) {</span>
+<span class="nc" id="L18">      throw new IllegalStateException(&quot;Warehouse lock row is missing&quot;);</span>
+    }
+<span class="fc" id="L20">  }</span>
+
+  @Override
+  public List&lt;Warehouse&gt; getAll() {
+<span class="fc" id="L24">    return list(&quot;archivedAt is null order by id&quot;).stream().map(DbWarehouse::toWarehouse).toList();</span>
+  }
+
+  @Override
+  public void create(Warehouse warehouse) {
+<span class="fc" id="L29">    var entity = new DbWarehouse();</span>
+<span class="fc" id="L30">    copy(warehouse, entity);</span>
+<span class="fc" id="L31">    persistAndFlush(entity);</span>
+<span class="fc" id="L32">    warehouse.id = entity.id;</span>
+<span class="fc" id="L33">  }</span>
+
+  @Override
+  public void update(Warehouse warehouse) {
+<span class="fc" id="L37">    var entity = findById(warehouse.id);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">    if (entity == null) {</span>
+<span class="nc" id="L39">      throw new IllegalStateException(&quot;Warehouse no longer exists: &quot; + warehouse.id);</span>
+    }
+<span class="fc" id="L41">    copy(warehouse, entity);</span>
+<span class="fc" id="L42">    flush();</span>
+<span class="fc" id="L43">  }</span>
+
+  @Override
+  public void remove(Warehouse warehouse) {
+<span class="nc" id="L47">    warehouse.archivedAt = LocalDateTime.now();</span>
+<span class="nc" id="L48">    update(warehouse);</span>
+<span class="nc" id="L49">  }</span>
+
+  @Override
+  public Warehouse findActiveById(Long id) {
+<span class="fc" id="L53">    var entity = find(&quot;id = ?1 and archivedAt is null&quot;, id).firstResult();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">    return entity == null ? null : entity.toWarehouse();</span>
+  }
+
+  @Override
+  public Warehouse findByBusinessUnitCode(String code) {
+<span class="fc" id="L59">    var entity = find(&quot;businessUnitCode = ?1 and archivedAt is null&quot;, code).firstResult();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">    return entity == null ? null : entity.toWarehouse();</span>
+  }
+
+  private void copy(Warehouse warehouse, DbWarehouse entity) {
+<span class="fc" id="L64">    entity.businessUnitCode = warehouse.businessUnitCode;</span>
+<span class="fc" id="L65">    entity.location = warehouse.location;</span>
+<span class="fc" id="L66">    entity.capacity = warehouse.capacity;</span>
+<span class="fc" id="L67">    entity.stock = warehouse.stock;</span>
+<span class="fc" id="L68">    entity.createdAt = warehouse.createdAt;</span>
+<span class="fc" id="L69">    entity.archivedAt = warehouse.archivedAt;</span>
+<span class="fc" id="L70">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WarehouseResourceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">java-code-assignment</a> &gt; <a href="index.source.html" class="el_package">com.fulfilment.application.monolith.warehouses.adapters.restapi</a> &gt; <span class="el_source">WarehouseResourceImpl.java</span></div><h1>WarehouseResourceImpl.java</h1><pre class="source lang-java linenums">package com.fulfilment.application.monolith.warehouses.adapters.restapi;
+
+import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
+import com.fulfilment.application.monolith.warehouses.domain.ports.ArchiveWarehouseOperation;
+import com.fulfilment.application.monolith.warehouses.domain.ports.CreateWarehouseOperation;
+import com.fulfilment.application.monolith.warehouses.domain.ports.ReplaceWarehouseOperation;
+import com.warehouse.api.WarehouseResource;
+import com.warehouse.api.beans.Warehouse;
+import jakarta.enterprise.context.RequestScoped;
+import jakarta.inject.Inject;
+import jakarta.validation.constraints.NotNull;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.Produces;
+import java.util.List;
+import org.jboss.resteasy.reactive.ResponseStatus;
+
+@RequestScoped
+<span class="fc" id="L21">public class WarehouseResourceImpl implements WarehouseResource {</span>
+
+  @Inject WarehouseRepository warehouseRepository;
+  @Inject CreateWarehouseOperation createWarehouse;
+  @Inject ReplaceWarehouseOperation replaceWarehouse;
+  @Inject ArchiveWarehouseOperation archiveWarehouse;
+
+  @Override
+  public List&lt;Warehouse&gt; listAllWarehousesUnits() {
+<span class="fc" id="L30">    return warehouseRepository.getAll().stream().map(this::toWarehouseResponse).toList();</span>
+  }
+
+  @Override
+  @POST
+  @Consumes(&quot;application/json&quot;)
+  @Produces(&quot;application/json&quot;)
+  @ResponseStatus(201)
+  public Warehouse createANewWarehouseUnit(@NotNull Warehouse data) {
+<span class="fc" id="L39">    var warehouse = toDomain(data);</span>
+<span class="fc" id="L40">    createWarehouse.create(warehouse);</span>
+<span class="fc" id="L41">    return toWarehouseResponse(warehouse);</span>
+  }
+
+  @Override
+  public Warehouse getAWarehouseUnitByID(String id) {
+<span class="fc" id="L46">    var warehouse = warehouseRepository.findActiveById(parseId(id));</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">    if (warehouse == null) {</span>
+<span class="fc" id="L48">      throw new NotFoundException(&quot;Active warehouse does not exist&quot;);</span>
+    }
+<span class="fc" id="L50">    return toWarehouseResponse(warehouse);</span>
+  }
+
+  @Override
+  public void archiveAWarehouseUnitByID(String id) {
+<span class="fc" id="L55">    var warehouse = new com.fulfilment.application.monolith.warehouses.domain.models.Warehouse();</span>
+<span class="fc" id="L56">    warehouse.id = parseId(id);</span>
+<span class="fc" id="L57">    archiveWarehouse.archive(warehouse);</span>
+<span class="fc" id="L58">  }</span>
+
+  @Override
+  public Warehouse replaceTheCurrentActiveWarehouse(String businessUnitCode, @NotNull Warehouse data) {
+<span class="fc" id="L62">    var warehouse = toDomain(data);</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">    if (warehouse.businessUnitCode != null &amp;&amp; !businessUnitCode.equals(warehouse.businessUnitCode)) {</span>
+<span class="fc" id="L64">      throw new BadRequestException(&quot;Business unit code in the body must match the path&quot;);</span>
+    }
+<span class="fc" id="L66">    warehouse.businessUnitCode = businessUnitCode;</span>
+<span class="fc" id="L67">    replaceWarehouse.replace(warehouse);</span>
+<span class="fc" id="L68">    return toWarehouseResponse(warehouse);</span>
+  }
+
+  private Long parseId(String id) {
+    try {
+<span class="fc" id="L73">      long value = Long.parseLong(id);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">      if (value &lt;= 0) {</span>
+<span class="fc" id="L75">        throw new NumberFormatException();</span>
+      }
+<span class="fc" id="L77">      return value;</span>
+<span class="fc" id="L78">    } catch (NumberFormatException e) {</span>
+<span class="fc" id="L79">      throw new BadRequestException(&quot;Warehouse id must be a positive integer&quot;);</span>
+    }
+  }
+
+  private com.fulfilment.application.monolith.warehouses.domain.models.Warehouse toDomain(Warehouse data) {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">    if (data == null) {</span>
+<span class="fc" id="L85">      throw new BadRequestException(&quot;Warehouse body is required&quot;);</span>
+    }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">    if (data.getId() != null) {</span>
+<span class="fc" id="L88">      throw new BadRequestException(&quot;Id must not be set on a new warehouse&quot;);</span>
+    }
+<span class="fc" id="L90">    var warehouse = new com.fulfilment.application.monolith.warehouses.domain.models.Warehouse();</span>
+<span class="fc" id="L91">    warehouse.businessUnitCode = data.getBusinessUnitCode();</span>
+<span class="fc" id="L92">    warehouse.location = data.getLocation();</span>
+<span class="fc" id="L93">    warehouse.capacity = data.getCapacity();</span>
+<span class="fc" id="L94">    warehouse.stock = data.getStock();</span>
+<span class="fc" id="L95">    return warehouse;</span>
+  }
+
+  private Warehouse toWarehouseResponse(com.fulfilment.application.monolith.warehouses.domain.models.Warehouse warehouse) {
+<span class="fc" id="L99">    var response = new Warehouse();</span>
+<span class="fc" id="L100">    response.setId(warehouse.id.toString());</span>
+<span class="fc" id="L101">    response.setBusinessUnitCode(warehouse.businessUnitCode);</span>
+<span class="fc" id="L102">    response.setLocation(warehouse.location);</span>
+<span class="fc" id="L103">    response.setCapacity(warehouse.capacity);</span>
+<span class="fc" id="L104">    response.setStock(warehouse.stock);</span>
+<span class="fc" id="L105">    return response;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

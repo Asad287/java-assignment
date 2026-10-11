@@ -1,0 +1,58 @@
+name: fcs-assignment
+
+services:
+  database:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: assignment
+      POSTGRES_USER: assignment
+      POSTGRES_PASSWORD: assignment
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assignment -d assignment"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  application:
+    image: fcs-assignment:local
+    build:
+      context: .
+      dockerfile: src/main/docker/Dockerfile.jvm
+    environment:
+      DB_URL: jdbc:postgresql://database:5432/assignment
+      DB_USERNAME: assignment
+      DB_PASSWORD: assignment
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/q/health/ready > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 20
+
+  test-db:
+    image: postgres:16
+    profiles: [verification]
+    environment:
+      POSTGRES_DB: assignment_test
+      POSTGRES_USER: assignment
+      POSTGRES_PASSWORD: assignment
+    ports:
+      - "127.0.0.1:15433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assignment -d assignment_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:

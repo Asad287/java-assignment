@@ -1,0 +1,4 @@
+com\warehouse\api\beans\ApiError.class
+com\fulfilment\application\monolith\common\ApiErrorMapper$1.class
+com\warehouse\api\beans\Warehouse.class
+com\warehouse\api\WarehouseResource.class
